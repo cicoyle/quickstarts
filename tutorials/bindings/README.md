@@ -271,7 +271,7 @@ Now that the Kafka binding is set up, deploy the assets.
 
 <!-- STEP
 name: Run kubernetes apps
-sleep: 30
+sleep: 60
 expected_stdout_lines: 
   - component.dapr.io/sample-topic created
   - service/bindings-nodeapp created
