@@ -1,8 +1,7 @@
 version: 1
 common:
-  resourcesPath: ../../components
+  resourcesPath: ../../../components
 apps:
   - appID: order-processor
-    appDirPath: ./order-processor/
+    appDirPath: ./
     command: ["go", "run", "."]
-
