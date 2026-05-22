@@ -1,6 +1,5 @@
 # Fans `make <target>` out to every subfolder that has its own makefile.
-# Auto-discovers examples via wildcard, so dropping a new sibling project in
-# (e.g. patient-intake/ once it's runnable) requires no edits here.
+# Adding a makefile to an example is all it takes to wire it into `make validate`.
 
 APPS := $(patsubst %/makefile,%,$(wildcard */makefile))
 

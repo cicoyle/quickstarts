@@ -43,17 +43,33 @@ PatientIntake (workflow)
 
 ## Running this example
 
-1. Build and run with `dapr run`:
+Requires Dapr `1.18.0+` (workflow history propagation), `go-sdk v1.15.0+`,
+and `durabletask-go v0.12.0+`.
+
+Build the example:
+
+<!-- STEP
+name: Build patient-intake
+expected_stdout_lines:
+  - "patient-intake build OK"
+output_match_mode: substring
+background: false
+timeout_seconds: 180
+-->
 
 ```bash
-cd workflows/go/sdk/patient-intake
-go build -o patient-app .
-dapr run --app-id patient-app --resources-path ../../../components -- ./patient-app
+go build -o patient-app . && echo "patient-intake build OK"
 ```
 
-Build the binary and run it directly (rather than `go run .`) for clean
-signal handling. The app runs the demo once and exits on its own — no
-Ctrl+C needed.
+<!-- END_STEP -->
+
+Run the demo:
+
+```bash
+dapr run -f .
+```
+
+The app runs the demo once and exits on its own — no Ctrl+C needed.
 
 You'll see lines like:
 
@@ -78,6 +94,8 @@ of scope for this quickstart.
 ```
 patient-intake/
 ├── README.md      # this file
+├── dapr.yaml      # `dapr run -f .` config (appID, resources, command)
+├── makefile       # wires the example into `make validate`
 ├── main.go        # registry + worker setup, schedules one workflow run
 ├── models.go      # PatientRecord, ComplianceResult, DispenseResult
 ├── workflow.go    # workflow + activity definitions, history helpers
