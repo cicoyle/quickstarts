@@ -81,5 +81,5 @@ patient-intake/
 ├── main.go        # registry + worker setup, schedules one workflow run
 ├── models.go      # PatientRecord, ComplianceResult, DispenseResult
 ├── workflow.go    # workflow + activity definitions, history helpers
-└── go.mod         # see note above re: PR #823
+└── go.mod         # module + deps
 ```

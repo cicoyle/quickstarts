@@ -1,9 +1,9 @@
 package main
 
 // PatientRecord represents a patient intake submitted by the front desk.
-// In a real deployment the Name / DOB / MRN fields are protected health info
-// and would be candidates for redaction when the record is propagated downstream
-// this is a future add for history propagation.
+// In a real deployment, the Name, DOB, and MRN fields are protected health
+// information (PHI). They would be candidates for redaction when the record is
+// propagated downstream — a future addition for history propagation.
 type PatientRecord struct {
 	PatientID  string  `json:"patientId"`
 	Name       string  `json:"name"`

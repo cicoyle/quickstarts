@@ -3,15 +3,15 @@ module dapr_example_patient_intake
 go 1.26.3
 
 require (
-	github.com/dapr/durabletask-go v0.11.4-0.20260519200427-df9b47275282
-	github.com/dapr/go-sdk v1.14.1
+	github.com/dapr/durabletask-go v0.12.0
+	github.com/dapr/go-sdk v1.15.0-rc.1
 )
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/dapr/dapr v1.17.0 // indirect
-	github.com/dapr/kit v0.17.1-0.20260505124817-5579fd105e21 // indirect
+	github.com/dapr/dapr v1.18.0-rc.4 // indirect
+	github.com/dapr/kit v0.18.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -28,9 +28,4 @@ require (
 	google.golang.org/grpc v1.79.3 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-)
-
-replace (
-	github.com/dapr/dapr => github.com/cicoyle/dapr v0.0.0-20260520192256-ce26937116c8
-	github.com/dapr/go-sdk => github.com/cicoyle/go-sdk v0.0.0-20260430202748-ec4a0fbd960c
 )
