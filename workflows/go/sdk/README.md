@@ -1,7 +1,8 @@
 # Dapr workflows — Go SDK quickstarts
 
-This directory contains Go quickstart examples for the Dapr Workflows. 
-Each example is self-contained: it has its own `README`, `dapr.yaml`, and `makefile`.
+This directory contains Go quickstart examples for the Dapr Workflows.
+Each example lives in its own directory with its own `README`; supporting files
+such as `dapr.yaml` and `makefile` vary by example.
 
 ## Examples
 
