@@ -67,19 +67,52 @@ func main() {
 	fmt.Println("               -> CheckAllergies -> ScreenDrugInteractions")
 	fmt.Println("               -> ComplianceAudit (child wf, lineage)     <-- sees PatientIntake + PrescribeMedication events")
 	fmt.Println("               -> DispenseMedication (activity, own only) <-- sees only PrescribeMedication events")
+
+	// Scenario 1 (happy path): PrescribeMedication forwards its own history to
+	// the pharmacy, which verifies the upstream screening and dispenses.
+	runScenario(ctx, wfClient, "SCENARIO 1: lineage forwarded — pharmacy dispenses",
+		"intake-ok", PatientRecord{
+			PatientID:      "P-1042",
+			Name:           "Jane Doe",
+			DOB:            "1985-06-12",
+			MRN:            "MRN-77231",
+			Condition:      "bacterial sinusitis",
+			Medication:     "amoxicillin",
+			Dosage:         500,
+			ForwardLineage: true,
+		})
+
+	// Scenario 2 (negative): PrescribeMedication dispenses WITHOUT propagating
+	// its history, so the pharmacy receives no lineage and refuses to dispense.
+	runScenario(ctx, wfClient, "SCENARIO 2: lineage withheld — pharmacy refuses",
+		"intake-missing-lineage", PatientRecord{
+			PatientID:      "P-2087",
+			Name:           "John Roe",
+			DOB:            "1979-03-04",
+			MRN:            "MRN-55810",
+			Condition:      "strep throat",
+			Medication:     "penicillin",
+			Dosage:         500,
+			ForwardLineage: false,
+		})
+
 	fmt.Println()
+	fmt.Println(banner("COMPLETE"))
+
+	// Both workflows have completed and their state was purged, so return.
+	// The deferred cancel() stops the worker and lets `dapr run` exit on its
+	// own — no Ctrl+C needed.
+}
+
+// runScenario schedules one PatientIntake run, waits for it to finish, prints
+// the final result, and purges its state so the demo can exit cleanly.
+func runScenario(ctx context.Context, wfClient *workflow.Client, title, instanceID string, rec PatientRecord) {
+	fmt.Println()
+	fmt.Println(banner(title))
 
 	id, err := wfClient.ScheduleWorkflow(ctx, "PatientIntake",
-		workflow.WithInstanceID("intake-001"),
-		workflow.WithInput(PatientRecord{
-			PatientID:  "P-1042",
-			Name:       "Jane Doe",
-			DOB:        "1985-06-12",
-			MRN:        "MRN-77231",
-			Condition:  "bacterial sinusitis",
-			Medication: "amoxicillin",
-			Dosage:     500,
-		}),
+		workflow.WithInstanceID(instanceID),
+		workflow.WithInput(rec),
 	)
 	if err != nil {
 		logger.Fatalf("failed to start workflow: %v", err)
@@ -87,22 +120,18 @@ func main() {
 	fmt.Printf("  [main] Started workflow: %s\n", id)
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, 30*time.Second)
-	_, err = wfClient.WaitForWorkflowCompletion(waitCtx, id)
-	waitCancel()
+	defer waitCancel()
+	meta, err := wfClient.WaitForWorkflowCompletion(waitCtx, id)
 	if err != nil {
 		logger.Fatalf("workflow failed: %v", err)
+	}
+	if meta != nil {
+		fmt.Printf("  [main] Result: %s\n", meta.Output.GetValue())
 	}
 
 	if err = wfClient.PurgeWorkflowState(ctx, id); err != nil {
 		logger.Printf("failed to purge: %v", err)
 	}
-
-	fmt.Println()
-	fmt.Println(banner("COMPLETE"))
-
-	// The workflow has completed and its state was purged above, so return.
-	// The deferred cancel() stops the worker and lets `dapr run` exit on its
-	// own — no Ctrl+C needed.
 }
 
 func banner(msg string) string {

@@ -12,6 +12,11 @@ type PatientRecord struct {
 	Condition  string  `json:"condition"`
 	Medication string  `json:"medication"`
 	Dosage     float64 `json:"dosage"`
+	// ForwardLineage controls whether PrescribeMedication propagates its own
+	// history to the DispenseMedication activity. When true (happy path) the
+	// pharmacy can verify the upstream screening and dispenses. When false
+	// (negative scenario) the pharmacy receives no lineage and refuses.
+	ForwardLineage bool `json:"forwardLineage"`
 }
 
 // ComplianceResult is the output of the ComplianceAudit child workflow.
@@ -23,8 +28,12 @@ type ComplianceResult struct {
 }
 
 // DispenseResult is the output of the DispenseMedication activity.
+// Status is "dispensed" when the pharmacy filled the prescription, or
+// "refused" when it could not verify the prescribing pipeline in the
+// propagated history (Reason explains what was missing).
 type DispenseResult struct {
 	DispenseID string `json:"dispenseId"`
 	Status     string `json:"status"`
+	Reason     string `json:"reason,omitempty"`
 	EventCount int    `json:"eventCount"`
 }

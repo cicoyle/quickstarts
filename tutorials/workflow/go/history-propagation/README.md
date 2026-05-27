@@ -21,6 +21,7 @@ PatientIntake (workflow)
     │     → sees PatientIntake + PrescribeMedication events
     └── DispenseMedication (activity, PropagateOwnHistory)
           → sees PrescribeMedication events only
+          → refuses to dispense if the screening lineage is missing
 ```
 
 ### Propagation scope
@@ -40,6 +41,24 @@ PatientIntake (workflow)
 - **DispenseMedication** receives only PrescribeMedication's history via
   `PropagateOwnHistory()`. The PatientIntake ancestral history is excluded
   — the pharmacy system doesn't need (or get to see) the upstream chain.
+  Before dispensing, the pharmacy verifies that `CheckAllergies` and
+  `ScreenDrugInteractions` completed in the propagated history.
+
+### Scenarios
+
+The demo runs two scenarios back-to-back to show both the happy path and
+the pharmacy's safety check:
+
+1. **Lineage forwarded → pharmacy dispenses.** `PrescribeMedication` calls
+   `DispenseMedication` with `PropagateOwnHistory()`. The pharmacy sees the
+   completed allergy and interaction screens in the propagated history and
+   fills the prescription.
+
+2. **Lineage withheld → pharmacy refuses.** `PrescribeMedication` calls
+   `DispenseMedication` **without** history propagation (simulating an
+   upstream system that fails to forward its lineage). With no propagated
+   history to prove the prescription was screened, the pharmacy refuses to
+   dispense and returns a `refused` result explaining what was missing.
 
 ## Running this example
 
@@ -69,15 +88,25 @@ Run the demo:
 dapr run -f .
 ```
 
-The app runs the demo once and exits on its own — no Ctrl+C needed.
+The app runs both scenarios once and exits on its own — no Ctrl+C needed.
 
-You'll see lines like:
+In scenario 1 (lineage forwarded) you'll see the pharmacy dispense:
 
 ```
 [ComplianceAudit] Received propagated history: 15 events (scope: LINEAGE)
 [ComplianceAudit] APPROVED (risk=0.10)
-[DispenseMedication] Dispensing amoxicillin 500mg ... (propagated history: 12 events, scope=OWN_HISTORY)
+[DispenseMedication] Dispense request: amoxicillin 500mg ... (propagated history: 12 events, scope=OWN_HISTORY)
 [DispenseMedication] DISPENSED: rx-P-1042-...
+```
+
+In scenario 2 (lineage withheld) the pharmacy refuses:
+
+```
+[PrescribeMedication] Step 4: CallActivity(DispenseMedication)
+                      -> NO history propagation (negative scenario)
+[DispenseMedication] Dispense request: penicillin 500mg ... (propagated history: none)
+[DispenseMedication] REFUSED — no propagated history; cannot verify screening for P-2087
+[PrescribeMedication] Step 4 BLOCKED: pharmacy refused to dispense (missing lineage: no propagated history received from prescriber)
 ```
 
 In standalone mode the sidecar will log
@@ -92,12 +121,13 @@ of scope for this quickstart.
 ## Files
 
 ```
-patient-intake/
+history-propagation/
 ├── README.md      # this file
 ├── dapr.yaml      # `dapr run -f .` config (appID, resources, command)
 ├── makefile       # wires the example into `make validate`
-├── main.go        # registry + worker setup, schedules one workflow run
+├── main.go        # registry + worker setup, schedules both scenarios
 ├── models.go      # PatientRecord, ComplianceResult, DispenseResult
 ├── workflow.go    # workflow + activity definitions, history helpers
-└── go.mod         # module + deps
+├── go.mod         # module + deps
+└── go.sum
 ```

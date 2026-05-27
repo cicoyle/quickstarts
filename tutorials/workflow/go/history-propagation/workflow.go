@@ -133,17 +133,35 @@ func PrescribeMedication(ctx *workflow.WorkflowContext) (any, error) {
 	}
 
 	// Step 4: Dispense the medication.
-	// PropagateOwnHistory() — include our events only (no ancestral chain)
+	// In the happy path we attach PropagateOwnHistory() — the pharmacy
+	// receives our events only (no ancestral chain) and can verify that the
+	// allergy and interaction screens ran. In the negative scenario
+	// (rec.ForwardLineage == false) we deliberately omit propagation, so the
+	// pharmacy receives no lineage and refuses to dispense.
+	dispenseOpts := []workflow.CallActivityOption{workflow.WithActivityInput(rec)}
+	if rec.ForwardLineage {
+		dispenseOpts = append(dispenseOpts,
+			workflow.WithHistoryPropagation(workflow.PropagateOwnHistory()))
+	}
 	if !ctx.IsReplaying() {
-		fmt.Println("  [PrescribeMedication] Step 4: CallActivity(DispenseMedication)")
-		fmt.Println("                        -> WithHistoryPropagation(PropagateOwnHistory)")
+		if rec.ForwardLineage {
+			fmt.Println("  [PrescribeMedication] Step 4: CallActivity(DispenseMedication)")
+			fmt.Println("                        -> WithHistoryPropagation(PropagateOwnHistory)")
+		} else {
+			fmt.Println("  [PrescribeMedication] Step 4: CallActivity(DispenseMedication)")
+			fmt.Println("                        -> NO history propagation (negative scenario)")
+		}
 	}
 	var dispense DispenseResult
-	if err := ctx.CallActivity(DispenseMedication,
-		workflow.WithActivityInput(rec),
-		workflow.WithHistoryPropagation(workflow.PropagateOwnHistory()),
-	).Await(&dispense); err != nil {
+	if err := ctx.CallActivity(DispenseMedication, dispenseOpts...).Await(&dispense); err != nil {
 		return nil, fmt.Errorf("dispense failed: %w", err)
+	}
+	if dispense.Status != "dispensed" {
+		if !ctx.IsReplaying() {
+			fmt.Printf("  [PrescribeMedication] Step 4 BLOCKED: pharmacy refused to dispense (%s)\n",
+				dispense.Reason)
+		}
+		return fmt.Sprintf("prescription not dispensed: pharmacy refused (%s)", dispense.Reason), nil
 	}
 	if !ctx.IsReplaying() {
 		fmt.Printf("  [PrescribeMedication] Step 4 complete: dispensed (id=%s, %d events verified)\n",
@@ -282,9 +300,11 @@ func ComplianceAudit(ctx *workflow.WorkflowContext) (any, error) {
 	}, nil
 }
 
-// DispenseMedication issues the final prescription. It inspects the
-// propagated workflow history to verify the prescribing pipeline executed
-// correctly before dispensing.
+// DispenseMedication issues the final prescription. The pharmacy refuses to
+// dispense unless the propagated workflow history proves the prescribing
+// pipeline ran the required allergy and drug-interaction screens. If no
+// history is propagated (or it is missing those checks), it returns a
+// "refused" result instead of dispensing.
 func DispenseMedication(ctx workflow.ActivityContext) (any, error) {
 	var rec PatientRecord
 	if err := ctx.GetInput(&rec); err != nil {
@@ -292,24 +312,55 @@ func DispenseMedication(ctx workflow.ActivityContext) (any, error) {
 	}
 
 	ph := ctx.GetPropagatedHistory()
-	fmt.Printf("  [DispenseMedication] Dispensing %s %.0fmg for %s (propagated history: %s)\n",
+	fmt.Printf("  [DispenseMedication] Dispense request: %s %.0fmg for %s (propagated history: %s)\n",
 		rec.Medication, rec.Dosage, rec.PatientID, describeHistory(ph))
 
-	eventCount := 0
-	if ph != nil {
-		eventCount = len(ph.Events())
-		fmt.Printf("  [DispenseMedication] Apps in chain: %v\n", ph.GetAppIDs())
-		for _, wf := range ph.GetWorkflows() {
-			fmt.Printf("  [DispenseMedication]   workflow: app=%s, name=%s, instance=%s\n",
-				wf.AppID, wf.Name, wf.InstanceID)
+	// Pharmacy policy: no lineage, no dispense. Without propagated history the
+	// pharmacy cannot prove the prescription was screened, so it refuses.
+	if ph == nil {
+		fmt.Printf("  [DispenseMedication] REFUSED — no propagated history; cannot verify screening for %s\n",
+			rec.PatientID)
+		return DispenseResult{
+			Status: "refused",
+			Reason: "missing lineage: no propagated history received from prescriber",
+		}, nil
+	}
+
+	eventCount := len(ph.Events())
+	fmt.Printf("  [DispenseMedication] Apps in chain: %v\n", ph.GetAppIDs())
+	for _, wf := range ph.GetWorkflows() {
+		fmt.Printf("  [DispenseMedication]   workflow: app=%s, name=%s, instance=%s\n",
+			wf.AppID, wf.Name, wf.InstanceID)
+	}
+	scheduledNames := make(map[string]string) // key=taskExecutionId, val=activity name
+	for i, event := range ph.Events() {
+		if ts := event.GetTaskScheduled(); ts != nil {
+			scheduledNames[ts.GetTaskExecutionId()] = ts.GetName()
 		}
-		scheduledNames := make(map[string]string) // key=taskExecutionId, val=activity name
-		for i, event := range ph.Events() {
-			if ts := event.GetTaskScheduled(); ts != nil {
-				scheduledNames[ts.GetTaskExecutionId()] = ts.GetName()
-			}
-			fmt.Printf("  [DispenseMedication]   event[%d]: %s\n", i, describeEventResolved(event, scheduledNames))
-		}
+		fmt.Printf("  [DispenseMedication]   event[%d]: %s\n", i, describeEventResolved(event, scheduledNames))
+	}
+
+	// Verify the prescriber's own history shows both screens completed.
+	prescribeWf, err := ph.GetLastWorkflowByName("PrescribeMedication")
+	if err != nil {
+		fmt.Printf("  [DispenseMedication] REFUSED — propagated history is missing the PrescribeMedication lineage for %s\n",
+			rec.PatientID)
+		return DispenseResult{
+			Status:     "refused",
+			Reason:     "missing lineage: PrescribeMedication not present in propagated history",
+			EventCount: eventCount,
+		}, nil
+	}
+	allergies, errAllergy := prescribeWf.GetLastActivityByName("CheckAllergies")
+	interactions, errInteraction := prescribeWf.GetLastActivityByName("ScreenDrugInteractions")
+	if errAllergy != nil || errInteraction != nil || !allergies.Completed || !interactions.Completed {
+		fmt.Printf("  [DispenseMedication] REFUSED — required screening not verified in propagated history for %s\n",
+			rec.PatientID)
+		return DispenseResult{
+			Status:     "refused",
+			Reason:     "missing lineage: allergy/interaction screening not verified in propagated history",
+			EventCount: eventCount,
+		}, nil
 	}
 
 	dispenseID := fmt.Sprintf("rx-%s-%d", rec.PatientID, time.Now().UnixMilli())
