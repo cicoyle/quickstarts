@@ -2,7 +2,9 @@
 
 This example demonstrates how Dapr workflows can propagate their execution
 history to child workflows and activities, so downstream consumers can
-inspect the full (or partial) execution context of their caller.
+inspect the full (or partial) execution context of their caller. See the
+[Workflow history propagation](https://docs.dapr.io/developing-applications/building-blocks/workflow/workflow-history-propagation/)
+docs for the concept overview.
 
 The scenario is a patient intake / e-prescribing pipeline: a compliance
 audit and a pharmacy dispense step refuse to act unless they can see
@@ -84,9 +86,27 @@ go build -o patient-app . && echo "patient-intake build OK"
 
 Run the demo:
 
+<!-- STEP
+name: Run history-propagation demo
+expected_stdout_lines:
+  - "SCENARIO 1: lineage forwarded"
+  - "[ComplianceAudit] APPROVED"
+  - "[DispenseMedication] DISPENSED"
+  - "SCENARIO 2: lineage withheld"
+  - "[DispenseMedication] REFUSED"
+  - "pharmacy refused to dispense"
+  - "missing lineage: no propagated history received from prescriber"
+output_match_mode: substring
+background: false
+timeout_seconds: 180
+sleep: 15
+-->
+
 ```bash
 dapr run -f .
 ```
+
+<!-- END_STEP -->
 
 The app runs both scenarios once and exits on its own — no Ctrl+C needed.
 
