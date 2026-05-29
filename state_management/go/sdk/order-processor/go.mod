@@ -2,7 +2,7 @@ module order_processor_sdk_example
 
 go 1.26.3
 
-require github.com/dapr/go-sdk v1.15.0-rc.1
+require github.com/dapr/go-sdk v1.15.0-rc.2
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect

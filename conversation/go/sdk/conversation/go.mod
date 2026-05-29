@@ -3,7 +3,7 @@ module conversation
 go 1.26.3
 
 require (
-	github.com/dapr/go-sdk v1.15.0-rc.1
+	github.com/dapr/go-sdk v1.15.0-rc.2
 	github.com/invopop/jsonschema v0.13.0
 	google.golang.org/protobuf v1.36.11
 )
