@@ -3,7 +3,7 @@ module dapr_example
 go 1.26.3
 
 require (
-	github.com/dapr/durabletask-go v0.12.0
+	github.com/dapr/durabletask-go v0.12.1
 	github.com/dapr/go-sdk v1.15.0-rc.1
 )
 
@@ -11,7 +11,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dapr/dapr v1.18.0-rc.4 // indirect
-	github.com/dapr/kit v0.18.0 // indirect
+	github.com/dapr/kit v0.18.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
